@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  name          String
+  cpf           String   @unique
+  email         String   @unique
+  phone         String
+  password_hash String
+  address       String?
+  profilePic    String?
+  role          String   @default("USER") // USER, ADMIN
+  federationYear Int?    // Ano vigente (ex: 2026) da ativação
+  resetToken     String?  @unique
+  resetTokenExpires DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  orders        Order[]
+  creditCards   CreditCard[]
+}
+
+model Championship {
+  id              String   @id @default(uuid())
+  name            String
+  description     String
+  date            DateTime
+  location        String
+  banner          String?
+  priceComp       Float    // Preço para competidor
+  priceVis        Float    // Preço para visitante
+  status          String   @default("OPEN") // OPEN, CLOSED
+  hasTshirtPromotion Boolean @default(false)
+  tshirtLimitComp    Int      @default(50)
+  tshirtLimitVis     Int      @default(100)
+  mpPublicKey     String?  // Chave Pública Mercado Pago (Campeonato)
+  mpAccessToken   String?  // Access Token Mercado Pago (Campeonato)
+  mpWebhookSecret String?  // Webhook Secret Mercado Pago (Campeonato)
+  
+  federationFee      Float    @default(50.0) // Valor da taxa de federação
+  mpFedPublicKey     String?  // Chave Pública Mercado Pago (Federação)
+  mpFedAccessToken   String?  // Access Token Mercado Pago (Federação)
+  mpFedWebhookSecret String?  // Webhook Secret Mercado Pago (Federação)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  orders      Order[]
+}
+
+model Order {
+  id              String       @id @default(uuid())
+  userId          String
+  championshipId  String?      // Optional for standalone Federation charges
+  type            String       // "COMPETITOR", "VISITOR", "FEDERATION"
+  paymentStatus   String       // "PENDING", "APPROVED", "FAILED"
+  amount          Float
+  includesFederation Boolean   @default(false)
+  wonTshirt       Boolean      @default(false)
+  gatewayOrderId  String?      @unique // ID retornado pelo Mercado Pago (payment.id)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user            User         @relation(fields: [userId], references: [id])
+  championship    Championship? @relation(fields: [championshipId], references: [id])
+  ticket          Ticket?
+}
+
+model Ticket {
+  id          String   @id @default(uuid())
+  uuid        String   @unique @default(uuid()) // UUID for QRCode reading
+  orderId     String   @unique
+  status      String   @default("VALID") // "VALID" or "USED"
+  createdAt   DateTime @default(now())
+  validatedAt DateTime?
+
+  order       Order    @relation(fields: [orderId], references: [id])
+}
+
+model CreditCard {
+  id           String   @id @default(uuid())
+  userId       String
+  maskedNumber String
+  expiry       String
+  token        String   // Simulando token do gateway (pagarme/stripe)
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model Upload {
+  id        String   @id @default(uuid())
+  filename  String
+  mimeType  String
+  data      Bytes
+  createdAt DateTime @default(now())
+}
